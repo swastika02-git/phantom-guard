@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { MessageSquare, Link2, Image as ImageIcon, Sparkles, AlertCircle, RefreshCw, ArrowRight } from 'lucide-react';
 import type { AnalysisResult, LanguageCode } from '../../types/analysis';
+import { analyzeTextAPI } from '../../services/api';
 
 interface ScannerTabProps {
   onAnalyzeStart: () => void;
@@ -73,7 +74,7 @@ export const ScannerTab: React.FC<ScannerTabProps> = ({
     },
   ];
 
-  // Perform Analysis (Phase 1 Frontend Engine with real heuristics, ready for Phase 2 API binding)
+  // Perform Analysis (Tries FastAPI backend first, with resilient fallback)
   const handleAnalyze = async () => {
     const inputContent = mode === 'message' ? textContent : mode === 'link' ? urlContent : manualOcrText;
     if (!inputContent.trim() && mode !== 'screenshot') return;
@@ -81,10 +82,21 @@ export const ScannerTab: React.FC<ScannerTabProps> = ({
     setIsAnalyzing(true);
     onAnalyzeStart();
 
-    // Simulated short analysis delay for the fluid scanning animation (1.2s)
-    await new Promise((res) => setTimeout(res, 1200));
+    // 1. Try Live FastAPI Backend First
+    if (mode === 'message' || (mode === 'screenshot' && manualOcrText.trim())) {
+      try {
+        const liveResult = await analyzeTextAPI(inputContent);
+        setIsAnalyzing(false);
+        onAnalyzeComplete(liveResult);
+        return;
+      } catch (err) {
+        console.warn('Backend API call notice, evaluating with client engine:', err);
+      }
+    }
 
-    // Dynamic heuristic evaluation for Phase 1 demonstration
+    // 2. Client-side heuristic fallback
+    await new Promise((res) => setTimeout(res, 800));
+
     const flags = [];
     let score = 12;
     let verdict = 'Looks calm';
@@ -170,8 +182,8 @@ export const ScannerTab: React.FC<ScannerTabProps> = ({
       verdict,
       verdictLevel,
       language: detectedLanguage,
-      confidence: 0.91,
-      modelVersion: 'Phase1-ClientHeuristic-v1.0 (Backend Ready)',
+      confidence: 0.90,
+      modelVersion: 'rule-engine-v1.0 (client-fallback)',
       flags,
       recommendations: score > 30
         ? [
