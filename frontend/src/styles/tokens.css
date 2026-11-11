@@ -1,0 +1,73 @@
+/* ==========================================================================
+   PHANTOM GUARD DESIGN SYSTEM TOKENS
+   Playful + Protective + Futuristic + Premium + Approachable
+   ========================================================================== */
+
+:root {
+  /* Core Brand Colors */
+  --bg-primary: #FFFDFB;
+  --bg-secondary: #FFE8EF;
+  --accent-pink: #F4A6C1;
+  --accent-blue: #A9D6F5;
+  --accent-yellow: #FFE69A;
+  
+  /* Status Colors */
+  --status-mint: #B8E8CF;
+  --status-mint-deep: #2E855D;
+  --status-mint-bg: #EEFBF4;
+  
+  --status-warning: #FFD166;
+  --status-warning-deep: #9E7400;
+  --status-warning-bg: #FFF9E6;
+  
+  --status-danger: #F28B82;
+  --status-danger-deep: #B3261E;
+  --status-danger-bg: #FEECEB;
+
+  /* Neutral Typography Colors */
+  --text-primary: #252B45;
+  --text-secondary: #777B91;
+  --text-tertiary: #A6AABF;
+  --text-light: #FFFFFF;
+
+  /* Surfaces & Borders */
+  --surface-white: #FFFFFF;
+  --surface-card: rgba(255, 255, 255, 0.92);
+  --surface-glass: rgba(255, 255, 255, 0.82);
+  --border-subtle: rgba(37, 43, 69, 0.08);
+  --border-medium: rgba(37, 43, 69, 0.14);
+  --border-pink: rgba(244, 166, 193, 0.45);
+  --border-blue: rgba(169, 214, 245, 0.45);
+
+  /* Gradients */
+  --grad-hero: linear-gradient(135deg, #FFFDFB 0%, #FFE8EF 45%, #F0F7FF 100%);
+  --grad-pink-lavender: linear-gradient(135deg, #FFE8EF 0%, #E8E5FA 100%);
+  --grad-blue-white: linear-gradient(135deg, #A9D6F5 0%, #FFFFFF 100%);
+  --grad-yellow-peach: linear-gradient(135deg, #FFE69A 0%, #FFD6BA 100%);
+  --grad-pink-coral: linear-gradient(135deg, #F4A6C1 0%, #F28B82 100%);
+  --grad-card: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 245, 248, 0.85) 100%);
+
+  /* Shadows */
+  --shadow-sm: 0 2px 8px rgba(37, 43, 69, 0.04);
+  --shadow-md: 0 8px 24px -4px rgba(244, 166, 193, 0.22), 0 4px 12px rgba(37, 43, 69, 0.05);
+  --shadow-lg: 0 16px 36px -8px rgba(37, 43, 69, 0.09), 0 8px 20px rgba(244, 166, 193, 0.18);
+  --shadow-glow-mint: 0 0 24px rgba(184, 232, 207, 0.6);
+  --shadow-glow-yellow: 0 0 24px rgba(255, 209, 102, 0.6);
+  --shadow-glow-coral: 0 0 24px rgba(242, 139, 130, 0.6);
+
+  /* Typography */
+  --font-heading: 'Fredoka', cursive, sans-serif;
+  --font-body: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+  /* Border Radii */
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --radius-pill: 9999px;
+
+  /* Layout */
+  --max-width: 1200px;
+  --transition-bounce: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  --transition-smooth: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+}

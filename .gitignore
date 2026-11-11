@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+frontend/dist/
+frontend/dist-ssr/
+
+# Python virtual environment & bytecode
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.joblib
+*.pkl
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environment Variables & Secrets
+.env
+.env.local
+*.pem
+*.key
+
+# Operating System & IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary uploads (never commit user data)
+uploads/
+tmp/
+*.log
