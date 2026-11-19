@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { MessageSquare, Link2, Image as ImageIcon, Sparkles, AlertCircle, RefreshCw, ArrowRight } from 'lucide-react';
 import type { AnalysisResult, LanguageCode } from '../../types/analysis';
-import { analyzeTextAPI } from '../../services/api';
+import { analyzeTextAPI, analyzeURLAPI, analyzeImageAPI } from '../../services/api';
 
 interface ScannerTabProps {
   onAnalyzeStart: () => void;
@@ -20,8 +20,10 @@ export const ScannerTab: React.FC<ScannerTabProps> = ({
   const [mode, setMode] = useState<ScanMode>('message');
   const [textContent, setTextContent] = useState('');
   const [urlContent, setUrlContent] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [manualOcrText, setManualOcrText] = useState('');
+  const [ocrNotice, setOcrNotice] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   // Quick heuristic language detector for live indicator
@@ -46,57 +48,136 @@ export const ScannerTab: React.FC<ScannerTabProps> = ({
       id: 'kyc_scam',
       badge: 'Hinglish Scam',
       title: 'Fake Banking KYC',
+      mode: 'message' as const,
       text: 'Congratulations aapka account block hone wala hai KYC immediately complete karo: http://sbi-kyc-verify.top/login.php',
     },
     {
       id: 'investment_scam',
       badge: 'Hinglish Scam',
       title: 'Guaranteed Returns',
+      mode: 'message' as const,
       text: 'Sir investment double ho jayega 100% guaranteed return hai! VIP Telegram group join karo aur daily payout lo.',
     },
     {
       id: 'hindi_job_scam',
       badge: 'Hindi Scam',
       title: 'Part-Time Job Trap',
+      mode: 'message' as const,
       text: 'घर बैठे यूट्यूब वीडियो लाइक करके रोज़ाना ₹3000 कमाएं। तुरंत व्हाट्सएप पर संपर्क करें और ₹500 रजिस्ट्रेशन फीस भेजें।',
+    },
+    {
+      id: 'url_phishing',
+      badge: 'Phishing URL',
+      title: 'SBI Lookalike Domain',
+      mode: 'link' as const,
+      text: 'http://sbi-kyc-verification.top/login.php',
     },
     {
       id: 'genuine_delivery',
       badge: 'Genuine Alert (Hard Negative)',
       title: 'Legitimate Delivery',
+      mode: 'message' as const,
       text: 'Bluedart: Your package with AWB 8920194 is out for delivery with agent Ramesh. Provide OTP 4921 only after receiving your package.',
     },
     {
       id: 'genuine_bank',
       badge: 'Genuine Alert (Hard Negative)',
       title: 'Legitimate Bank Alert',
+      mode: 'message' as const,
       text: 'HDFC Bank Alert: Rs 450.00 debited from A/c **4921 for Swiggy txn. Not you? SMS BLOCK to 5676712 immediately.',
     },
   ];
 
   // Perform Analysis (Tries FastAPI backend first, with resilient fallback)
   const handleAnalyze = async () => {
-    const inputContent = mode === 'message' ? textContent : mode === 'link' ? urlContent : manualOcrText;
-    if (!inputContent.trim() && mode !== 'screenshot') return;
-
     setIsAnalyzing(true);
     onAnalyzeStart();
 
-    // 1. Try Live FastAPI Backend First
-    if (mode === 'message' || (mode === 'screenshot' && manualOcrText.trim())) {
+    // Mode 1: Message
+    if (mode === 'message') {
+      const inputContent = textContent.trim();
+      if (!inputContent) {
+        setIsAnalyzing(false);
+        return;
+      }
       try {
         const liveResult = await analyzeTextAPI(inputContent);
         setIsAnalyzing(false);
         onAnalyzeComplete(liveResult);
         return;
       } catch (err) {
-        console.warn('Backend API call notice, evaluating with client engine:', err);
+        console.warn('Backend Text API notice, using fallback:', err);
+      }
+    }
+
+    // Mode 2: Link
+    if (mode === 'link') {
+      const urlToTest = urlContent.trim();
+      if (!urlToTest) {
+        setIsAnalyzing(false);
+        return;
+      }
+      try {
+        const liveUrlResult = await analyzeURLAPI(urlToTest);
+        setIsAnalyzing(false);
+        onAnalyzeComplete(liveUrlResult);
+        return;
+      } catch (err) {
+        console.warn('Backend URL API notice, using client evaluation:', err);
+      }
+    }
+
+    // Mode 3: Screenshot
+    if (mode === 'screenshot') {
+      if (selectedFile) {
+        try {
+          const ocrResp = await analyzeImageAPI(selectedFile);
+          if (ocrResp.status === 'success' && ocrResp.result) {
+            setIsAnalyzing(false);
+            onAnalyzeComplete(ocrResp.result);
+            return;
+          } else if (ocrResp.status === 'ocr_unavailable') {
+            setOcrNotice(ocrResp.message);
+            // If user provided manual text, analyze that via text API
+            if (manualOcrText.trim()) {
+              const liveResult = await analyzeTextAPI(manualOcrText.trim());
+              setIsAnalyzing(false);
+              onAnalyzeComplete({
+                ...liveResult,
+                analysisType: 'screenshot',
+                submittedContentSnippet: `[Screenshot Verification] ${manualOcrText.trim().slice(0, 160)}`,
+              });
+              return;
+            } else {
+              setIsAnalyzing(false);
+              return;
+            }
+          }
+        } catch (err) {
+          console.warn('Backend image OCR notice, using manual text fallback:', err);
+        }
+      }
+
+      if (manualOcrText.trim()) {
+        try {
+          const liveResult = await analyzeTextAPI(manualOcrText.trim());
+          setIsAnalyzing(false);
+          onAnalyzeComplete({
+            ...liveResult,
+            analysisType: 'screenshot',
+            submittedContentSnippet: `[Screenshot Manual Text] ${manualOcrText.trim().slice(0, 160)}`,
+          });
+          return;
+        } catch (err) {
+          console.warn('Backend Text API notice:', err);
+        }
       }
     }
 
     // 2. Client-side heuristic fallback
     await new Promise((res) => setTimeout(res, 800));
 
+    const inputContent = mode === 'message' ? textContent : mode === 'link' ? urlContent : manualOcrText;
     const flags = [];
     let score = 12;
     let verdict = 'Looks calm';
@@ -130,17 +211,17 @@ export const ScannerTab: React.FC<ScannerTabProps> = ({
       });
     }
 
-    // 3. Fake Authority / KYC
-    if (/kyc|account block|sebi|police|rbi|cbi|income tax/i.test(inputContent)) {
+    // 3. Fake Authority / KYC / Domain lookalike
+    if (/kyc|account block|sebi|police|rbi|cbi|income tax|sbi.*\.top|hdfc.*\.site/i.test(inputContent)) {
       score += 30;
       flags.push({
         id: 'authority_rule',
         ghostId: 'authority' as const,
         ghostName: 'Fake-Authority Phantom',
         title: 'Authority & Bank Impersonation',
-        explanation: 'Falsely claims association with regulatory bodies or banks to extract trust and sensitive credentials.',
+        explanation: 'Falsely claims association with regulatory bodies, banks, or brands to extract trust and sensitive credentials.',
         severity: 'high' as const,
-        evidenceSpan: inputContent.match(/kyc|account block|sebi|police|rbi/i)?.[0] || 'Impersonation detected',
+        evidenceSpan: inputContent.match(/kyc|account block|sebi|police|rbi|sbi|hdfc/i)?.[0] || 'Impersonation detected',
       });
     }
 
@@ -192,10 +273,10 @@ export const ScannerTab: React.FC<ScannerTabProps> = ({
             'Verify directly through official bank apps or RBI-registered portals.',
           ]
         : [
-            'This message does not exhibit known scam triggers.',
-            'Continue exercising routine caution with unverified senders.',
+            'This content does not exhibit known scam triggers.',
+            'Continue exercising routine caution with unverified sources.',
           ],
-      disclaimer: 'This score is a probabilistic risk indicator, not a definitive legal determination. Please verify independently.',
+      disclaimer: 'This score is an automated security indicator. Please verify independently before taking financial actions.',
       analysisType: mode === 'message' ? 'text' : mode === 'link' ? 'url' : 'screenshot',
       submittedContentSnippet: inputContent.slice(0, 160),
       timestamp: new Date().toLocaleTimeString(),
@@ -212,7 +293,9 @@ export const ScannerTab: React.FC<ScannerTabProps> = ({
         alert('File size exceeds 5MB limit.');
         return;
       }
+      setSelectedFile(file);
       setImagePreviewUrl(URL.createObjectURL(file));
+      setOcrNotice(null);
     }
   };
 
@@ -411,7 +494,7 @@ export const ScannerTab: React.FC<ScannerTabProps> = ({
             >
               <AlertCircle size={20} color="#B37D00" style={{ flexShrink: 0, marginTop: '2px' }} />
               <div style={{ fontSize: '0.85rem', color: '#664D00' }}>
-                <strong>Host Environment Notice:</strong> Native Tesseract OCR is currently not detected on this server. To ensure transparency, you can upload an image preview and review/edit the extracted text below before analysis.
+                <strong>Host Environment Transparency:</strong> {ocrNotice || 'Native Tesseract OCR engine is not detected in this host environment. Uploading an image will check server OCR capability; if unavailable, you can review or type the conversation text below to run our full hybrid AI & rule engine.'}
               </div>
             </div>
 
@@ -493,7 +576,9 @@ export const ScannerTab: React.FC<ScannerTabProps> = ({
               setTextContent('');
               setUrlContent('');
               setManualOcrText('');
+              setSelectedFile(null);
               setImagePreviewUrl(null);
+              setOcrNotice(null);
             }}
             style={{
               display: 'flex',
@@ -512,7 +597,12 @@ export const ScannerTab: React.FC<ScannerTabProps> = ({
 
           <button
             onClick={handleAnalyze}
-            disabled={isAnalyzing || (!textContent.trim() && !urlContent.trim() && !manualOcrText.trim())}
+            disabled={
+              isAnalyzing ||
+              (mode === 'message' && !textContent.trim()) ||
+              (mode === 'link' && !urlContent.trim()) ||
+              (mode === 'screenshot' && !selectedFile && !manualOcrText.trim())
+            }
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -524,7 +614,13 @@ export const ScannerTab: React.FC<ScannerTabProps> = ({
               fontSize: '1rem',
               fontWeight: 600,
               boxShadow: '0 6px 18px rgba(244, 166, 193, 0.45)',
-              opacity: isAnalyzing || (!textContent.trim() && !urlContent.trim() && !manualOcrText.trim()) ? 0.6 : 1,
+              opacity:
+                isAnalyzing ||
+                (mode === 'message' && !textContent.trim()) ||
+                (mode === 'link' && !urlContent.trim()) ||
+                (mode === 'screenshot' && !selectedFile && !manualOcrText.trim())
+                  ? 0.6
+                  : 1,
               transition: 'all 0.2s ease',
             }}
           >
@@ -568,8 +664,12 @@ export const ScannerTab: React.FC<ScannerTabProps> = ({
             <button
               key={demo.id}
               onClick={() => {
-                setMode('message');
-                setTextContent(demo.text);
+                setMode(demo.mode);
+                if (demo.mode === 'message') {
+                  setTextContent(demo.text);
+                } else if (demo.mode === 'link') {
+                  setUrlContent(demo.text);
+                }
               }}
               style={{
                 textAlign: 'left',
